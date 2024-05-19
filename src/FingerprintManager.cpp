@@ -131,6 +131,7 @@ uint8_t getFingerprintEnroll(uint8_t id) {
   p = finger.storeModel(id);
   if (p == FINGERPRINT_OK) {
     Serial.println("Stored!");
+    fingerState = menu;
   } else if (p == FINGERPRINT_PACKETRECIEVEERR) {
     Serial.println("Communication error");
     return p;

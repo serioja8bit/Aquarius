@@ -1,4 +1,5 @@
 #include "FingerprintManager.h"
+#include "KeyboardManager.h"
 #include <SPI.h>
 #include <TFT_eSPI.h>      // Hardware-specific library
 // #include <Adafruit_GFX.h>
@@ -24,6 +25,14 @@ struct TouchPoint {
   uint16_t x;
   uint16_t y;
   bool valid; // Indicates if the touch coordinates are valid
+};
+boolean Caps = false;
+String currentText = "";
+String symbol[4][10] = {
+  { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" }, // New numeric row
+  { "q", "w", "e", "r", "t", "y", "u", "i", "o", "p" },
+  { "a", "s", "d", "f", "g", "h", "j", "k", "l", "Enter" },
+  { "Caps", "z", "x", "c", "v", "b", "n", "m", ".", "<" }
 };
 
 #define mySerial Serial2
@@ -102,6 +111,7 @@ void loop() {
         // Enroll action
         action = 1;
         Serial.println("Enroll button pressed");
+        draw_BoxNButtons();
         break;
       } else if (isTouchWithinArea(touchPoint, BUTTON2_X, BUTTON2_Y, BUTTON_WIDTH, BUTTON_HEIGHT)) {
         // Verify action
@@ -114,8 +124,7 @@ void loop() {
       }
     }
   }
-  ////
-    drawMenu();
+    //drawMenu();
     switch (action) {
       case 1:
         Serial.println("Ready to enroll a fingerprint!");
