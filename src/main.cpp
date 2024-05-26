@@ -1,10 +1,8 @@
 #include "FingerprintManager.h"
 #include "KeyboardManager.h"
 #include <SPI.h>
-#include <TFT_eSPI.h>      // Hardware-specific library
-// #include <Adafruit_GFX.h>
+#include <TFT_eSPI.h>      
 #include <Adafruit_ILI9341.h>
-//#include <XPT2046_Touchscreen.h>
 
 #define BUTTON_HEIGHT 60
 #define BUTTON_WIDTH 120
@@ -28,6 +26,10 @@ struct TouchPoint {
 };
 boolean Caps = false;
 String currentText = "";
+//info
+String name="";
+String age;
+String weight;
 String symbol[4][10] = {
   { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" }, // New numeric row
   { "q", "w", "e", "r", "t", "y", "u", "i", "o", "p" },
@@ -46,9 +48,6 @@ float waterFlow = 0;
 const float calibrationFactor = 4.5; // Calibration factor for the sensor
 const int sampleTime = 1000; // Sample time in milliseconds
 /*===Prototype===*/
-void waterFlowTask(void *pvParameters);
-void fingerprintTask(void *pvParameters);
-void touchMenuTask(void *pvParameters);
 bool isTouchWithinArea(TouchPoint p, int x, int y, int width, int height);
 void drawMenu();
 TouchPoint getTouchCoordinates();
@@ -103,7 +102,7 @@ void setup() {
 
 void loop() {
   drawMenu();
-  while(1)
+  while(fingerState == menu)
   {
     TouchPoint touchPoint = getTouchCoordinates();
     if (touchPoint.valid) {
@@ -111,46 +110,44 @@ void loop() {
         // Enroll action
         action = 1;
         Serial.println("Enroll button pressed");
-        draw_BoxNButtons();
-        break;
+        fingerState = waiting;
       } else if (isTouchWithinArea(touchPoint, BUTTON2_X, BUTTON2_Y, BUTTON_WIDTH, BUTTON_HEIGHT)) {
         // Verify action
         action = 2;
         Serial.println("Verify button pressed");
         fingerState = waiting;
-        break;
+        
       } else {
         action = -1;
       }
     }
   }
-    //drawMenu();
+    drawMenu();
     switch (action) {
       case 1:
-        Serial.println("Ready to enroll a fingerprint!");
         id++;
         if (id == 0) {
             return;
         }
         Serial.print("Enrolling ID #");
         Serial.println(id);
-        while (!getFingerprintEnroll(id))
-        {
-          drawMenu();
-          delay(1000);
-        }
+        while (!getFingerprintEnroll(id));
+        draw_Keyboard();
+        name = checkTouch("Name");
+        age = checkTouch("Age");
+        weight = checkTouch("Weight");
+        drawInputFields(name, age, weight);
+        delay(10000);
+        fingerState = menu;
         action = -1;
         break;
       case 2:
         //drawMenu();
         Serial.println("Put your finger");
         id = 0;
-        while (!(id = getFingerprintID()))
-        {
-          drawMenu();
-          delay(1000);
-        }
+        while (!(id = getFingerprintID()));
         Serial.println(id);
+        fingerState = menu;
         action = -1;
         break;
       default:

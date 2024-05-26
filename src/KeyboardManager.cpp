@@ -3,7 +3,7 @@
 
 
 
-void draw_BoxNButtons() {
+void draw_Keyboard() {
     int i,j;
     tft.fillScreen(TFT_BLACK);
     tft.setTextSize(3);
@@ -49,9 +49,16 @@ void draw_BoxNButtons() {
       tft.print("RESET");
 }
 
-void checkTouch() {
+String checkTouch(String str) {
     uint16_t x, y;
-    if (tft.getTouch(&x, &y)) {
+    currentText = ""; // reset current text
+    tft.fillRect(0, 0, 320, 66, TFT_BLACK);
+    tft.setCursor(10, 10);  // Set text cursor within the cleared area
+    tft.setTextColor(TFT_WHITE);
+    tft.setTextSize(2);
+    tft.print(str + ": " + currentText);  // Display the current text
+    while(true){
+        if (tft.getTouch(&x, &y)) {
         // Ajustează calculele pentru keyRow pentru a reflecta noile poziții ale rândurilor de butoane
         int keyRow = (y - 66) / 35;  // Ajustează valoarea de start a Y de la 101 la 66
         int keyCol = x / 32;
@@ -59,11 +66,11 @@ void checkTouch() {
         if (keyRow >= 0 && keyRow < 4 && keyCol >= 0 && keyCol < 10) {
             String key = symbol[keyRow][keyCol];
             if (key == "Enter") {
-                Serial.println(currentText);
-                currentText = "";
+                return currentText;
+                delay(100);
             } else if (key == "Caps") {
                 Caps = !Caps;
-            } else if (key == "<") {
+            }else if (key == "<") {
                 if (currentText.length() > 0) {
                     currentText.remove(currentText.length() - 1);
                 }
@@ -73,10 +80,22 @@ void checkTouch() {
                 }
                 currentText += key;
             }
-            updateDisplay();
+            Serial.println(currentText);
+            // Adjust the fillRect to clear a smaller area, avoiding the top row of keys
+            tft.fillRect(0, 0, 320, 66, TFT_BLACK);  // Reduce height to 66
+            // Update the text display area accordingly
+            tft.setCursor(10, 10);  // Set text cursor within the cleared area
+            tft.setTextColor(TFT_WHITE);
+            tft.setTextSize(2);
+            tft.print(str + ": " + currentText);  // Display the current text
             delay(100);
+            
         }
+         
     }
+        
+    }
+    
 }
 
 
@@ -92,3 +111,18 @@ void updateDisplay() {
     tft.print("Prefix:" + currentText);  // Display the current text
 }
 
+void drawInputFields(String name, String age, String weight) {
+    
+    tft.fillScreen(TFT_BLACK);
+    tft.fillRect(20, 20, 280, 40, TFT_WHITE);  // Name field
+    tft.fillRect(20, 80, 280, 40, TFT_WHITE);  // Age field
+    tft.fillRect(20, 140, 280, 40, TFT_WHITE); // Weight field
+    tft.setTextColor(TFT_BLACK);
+    tft.setCursor(30, 30);
+    tft.print("Name: "+ name);
+    tft.setCursor(30, 90);
+    tft.print("Age: "+ age);
+    tft.setCursor(30, 150);
+    tft.print("Weight: "+ weight);
+        
+}

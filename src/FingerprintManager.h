@@ -13,8 +13,6 @@ enum FingerState {
     verifying,
     ok,
     fail,
-    
-
 };
 
 extern Adafruit_Fingerprint finger; // Declare external reference to fingerprint object

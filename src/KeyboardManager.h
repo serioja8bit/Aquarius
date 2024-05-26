@@ -2,9 +2,10 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 
-void draw_BoxNButtons(void);
-void checkTouch(void);
+void draw_Keyboard(void);
+String checkTouch(String);
 void updateDisplay(void);
+void drawInputFields(String, String, String);
 extern TFT_eSPI tft; 
 
 
