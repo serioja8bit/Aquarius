@@ -4,6 +4,40 @@
 #include <TFT_eSPI.h>
 #include <Adafruit_ILI9341.h>
 
+#define WIFI_SSID "12maimute"
+#define WIFI_PASSWORD "zebra321"
+
+#include <Arduino.h>
+#include <WiFi.h>
+#include <FirebaseESP32.h>
+
+// Provide the token generation process info.
+#include <addons/TokenHelper.h>
+
+// Provide the RTDB payload printing info and other helper functions.
+#include <addons/RTDBHelper.h>
+
+#define API_KEY "AIzaSyA66o6qdkddrtwBa4OSiYTDQkayQ2yMwEw"
+
+/* 3. If work with RTDB, define the RTDB URL */
+#define DATABASE_URL "https://aquarius-7acaa-default-rtdb.europe-west1.firebasedatabase.app/" //<databaseName>.firebaseio.com or <databaseName>.<region>.firebasedatabase.app
+
+/* 4. Define the Firebase Data object */
+FirebaseData fbdo;
+
+/* 5. Define the FirebaseAuth data for authentication data */
+FirebaseAuth auth;
+
+/* 6. Define the FirebaseConfig data for config data */
+FirebaseConfig config;
+
+unsigned long dataMillis = 0;
+int count = 0;
+bool signupOK = false;
+
+
+String path;
+
 #define BUTTON_HEIGHT 60
 #define BUTTON_WIDTH 120
 #define BUTTON_GAP 20
@@ -43,6 +77,7 @@ float totalWater = 0;
 float waterFlow = 0;
 const float calibrationFactor = 4.5;
 const int sampleTime = 1000;
+FingerState fingerState = menu;
 
 bool isTouchWithinArea(TouchPoint p, int x, int y, int width, int height);
 void drawMenu();
@@ -87,6 +122,45 @@ void setup() {
 
   uint16_t calData[5] = { 417, 3384, 359, 3388, 3 };
   tft.setTouch(calData);
+
+     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    Serial.print("Connecting to Wi-Fi");
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.print(".");
+        delay(300);
+    }
+    Serial.println();
+    Serial.print("Connected with IP: ");
+    Serial.println(WiFi.localIP());
+    Serial.println();
+
+    Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
+
+    config.api_key = API_KEY;
+
+    config.database_url = DATABASE_URL;
+
+    Firebase.reconnectNetwork(true);
+
+    fbdo.setBSSLBufferSize(4096 /* Rx buffer size in bytes from 512 - 16384 */, 1024 /* Tx buffer size in bytes from 512 - 16384 */);
+
+
+    Serial.print("Sign up new user... ");
+
+    if (Firebase.signUp(&config, &auth, "", ""))
+    {
+        Serial.println("ok");
+        signupOK = true;
+
+    }
+    else
+        Serial.printf("%s\n", config.signer.signupError.message.c_str());
+
+    config.token_status_callback = tokenStatusCallback; // see addons/TokenHelper.h
+
+    Firebase.begin(&config, &auth);
+
 }
 
 void loop() {
@@ -115,8 +189,11 @@ void loop() {
       id++;
       if (id == 0) return;
       Serial.print("Enrolling ID #"); Serial.println(id);
+      Firebase.setInt(fbdo, "test/int", id);
+      Serial.print(path);
       while (!getFingerprintEnroll(id));
-      path = "Persons/"+ id;
+      //Firebase.RTDB.setInt(&fbdo, path, count);
+      //(Firebase.RTDB.setInt(&fbdo, "test/int", count)
       draw_Keyboard();
       name = checkTouch("Name");
       age = checkTouch("Age");
