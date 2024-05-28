@@ -1,19 +1,17 @@
 #include "FingerprintManager.h"
 #include "KeyboardManager.h"
 #include <SPI.h>
-#include <TFT_eSPI.h>      
+#include <TFT_eSPI.h>
 #include <Adafruit_ILI9341.h>
 
 #define BUTTON_HEIGHT 60
 #define BUTTON_WIDTH 120
 #define BUTTON_GAP 20
 
-// Calcularea centrării butoanelor pe ecran
 #define SCREEN_WIDTH 320
 #define TOTAL_BUTTONS_WIDTH (2 * BUTTON_WIDTH + BUTTON_GAP)
 #define START_X ((SCREEN_WIDTH - TOTAL_BUTTONS_WIDTH) / 2)
 
-// Button areas
 #define BUTTON1_X START_X
 #define BUTTON1_Y 80
 #define BUTTON2_X (BUTTON1_X + BUTTON_WIDTH + BUTTON_GAP)
@@ -22,16 +20,16 @@
 struct TouchPoint {
   uint16_t x;
   uint16_t y;
-  bool valid; // Indicates if the touch coordinates are valid
+  bool valid;
 };
+
 boolean Caps = false;
 String currentText = "";
-//info
-String name="";
+String name = "";
 String age;
 String weight;
 String symbol[4][10] = {
-  { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" }, // New numeric row
+  { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" },
   { "q", "w", "e", "r", "t", "y", "u", "i", "o", "p" },
   { "a", "s", "d", "f", "g", "h", "j", "k", "l", "Enter" },
   { "Caps", "z", "x", "c", "v", "b", "n", "m", ".", "<" }
@@ -39,33 +37,28 @@ String symbol[4][10] = {
 
 #define mySerial Serial2
 
-/*===Water Flow Part===*/
-#define WATER_FLOW_SENSOR_PIN 34 // Example pin
-volatile int flowPulseCount = 0; // Pulse count from the sensor
-// Constants for flow rate calculation
+#define WATER_FLOW_SENSOR_PIN 34
+volatile int flowPulseCount = 0;
 float totalWater = 0;
 float waterFlow = 0;
-const float calibrationFactor = 4.5; // Calibration factor for the sensor
-const int sampleTime = 1000; // Sample time in milliseconds
-/*===Prototype===*/
+const float calibrationFactor = 4.5;
+const int sampleTime = 1000;
+
 bool isTouchWithinArea(TouchPoint p, int x, int y, int width, int height);
 void drawMenu();
 TouchPoint getTouchCoordinates();
 uint8_t readnumber(void);
 
-
 uint8_t id = 0;
 uint8_t action;
 
-TFT_eSPI tft = TFT_eSPI(); // Invoke custom library
+TFT_eSPI tft = TFT_eSPI();
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
-FingerState fingerState;
 
 void setup() {
   Serial.begin(9600);
-  while (!Serial);  // For Yun/Leo/Micro/Zero/...
+  while (!Serial);
   delay(100);
-   // Set the data rate for the sensor serial port
   finger.begin(57600);
 
   if (finger.verifyPassword()) {
@@ -74,121 +67,83 @@ void setup() {
     Serial.println("Did not find fingerprint sensor :(");
     while (1) { delay(1); }
   }
-  Serial.println(F("Reading sensor parameters"));
-  finger.getParameters();
-  Serial.print(F("Status: 0x"));        Serial.println(finger.status_reg, HEX);
-  Serial.print(F("Sys ID: 0x"));        Serial.println(finger.system_id, HEX);
-  Serial.print(F("Capacity: "));        Serial.println(finger.capacity);
-  Serial.print(F("Security level: "));  Serial.println(finger.security_level);
-  Serial.print(F("Device address: "));  Serial.println(finger.device_addr, HEX);
-  Serial.print(F("Packet len: "));      Serial.println(finger.packet_len);
-  Serial.print(F("Baud rate: "));       Serial.println(finger.baud_rate);
-  Serial.print("there are fingers stored"); Serial.println(countStoredFingerprints());
 
+  finger.getParameters();
+  Serial.print("Status: 0x"); Serial.println(finger.status_reg, HEX);
+  Serial.print("Sys ID: 0x"); Serial.println(finger.system_id, HEX);
+  Serial.print("Capacity: "); Serial.println(finger.capacity);
+  Serial.print("Security level: "); Serial.println(finger.security_level);
+  Serial.print("Device address: 0x"); Serial.println(finger.device_addr, HEX);
+  Serial.print("Packet len: "); Serial.println(finger.packet_len);
+  Serial.print("Baud rate: "); Serial.println(finger.baud_rate);
+  Serial.print("Stored fingers: "); Serial.println(countStoredFingerprints());
   id = countStoredFingerprints();
-  
-  /*===TFT init part===*/
   tft.begin();
   tft.setRotation(1);
   tft.fillScreen(ILI9341_BLACK);
   tft.setTextColor(ILI9341_WHITE);
   tft.setTextSize(3);
   tft.println("AquariusMK2");
-  //calibration
-  // Use this calibration code in setup():
+
   uint16_t calData[5] = { 417, 3384, 359, 3388, 3 };
   tft.setTouch(calData);
 }
 
 void loop() {
   drawMenu();
-  while(fingerState == menu)
-  {
+  while (fingerState == menu) {
     TouchPoint touchPoint = getTouchCoordinates();
     if (touchPoint.valid) {
       if (isTouchWithinArea(touchPoint, BUTTON1_X, BUTTON1_Y, BUTTON_WIDTH, BUTTON_HEIGHT)) {
-        // Enroll action
         action = 1;
         Serial.println("Enroll button pressed");
         fingerState = waiting;
       } else if (isTouchWithinArea(touchPoint, BUTTON2_X, BUTTON2_Y, BUTTON_WIDTH, BUTTON_HEIGHT)) {
-        // Verify action
         action = 2;
         Serial.println("Verify button pressed");
         fingerState = waiting;
-        
       } else {
         action = -1;
       }
     }
   }
-    drawMenu();
-    switch (action) {
-      case 1:
-        id++;
-        if (id == 0) {
-            return;
-        }
-        Serial.print("Enrolling ID #");
-        Serial.println(id);
-        while (!getFingerprintEnroll(id));
-        draw_Keyboard();
-        name = checkTouch("Name");
-        age = checkTouch("Age");
-        weight = checkTouch("Weight");
-        drawInputFields(name, age, weight);
-        delay(10000);
-        fingerState = menu;
-        action = -1;
-        break;
-      case 2:
-        //drawMenu();
-        Serial.println("Put your finger");
-        id = 0;
-        while (!(id = getFingerprintID()));
-        Serial.println(id);
-        fingerState = menu;
-        action = -1;
-        break;
-      default:
-        break;
-    }
-    delay(20); // Adjust delay as needed
+
+  switch (action) {
+    case 1:
+      fingerState = waiting;
+      drawMenu();
+      id++;
+      if (id == 0) return;
+      Serial.print("Enrolling ID #"); Serial.println(id);
+      while (!getFingerprintEnroll(id));
+      path = "Persons/"+ id;
+      draw_Keyboard();
+      name = checkTouch("Name");
+      age = checkTouch("Age");
+      weight = checkTouch("Weight");
+      drawInputFields(name, age, weight);
+      delay(10000);
+      fingerState = menu;
+      action = -1;
+      break;
+    case 2:
+      Serial.println("Put your finger");
+      fingerState = waiting;
+      drawMenu();
+      id = 0;
+      while (!(id = getFingerprintID()));
+      Serial.println(id);
+      fingerState = menu;
+      action = -1;
+      break;
+    default:
+      break;
+  }
+  delay(20);
 }
 
-// void IRAM_ATTR flowPulseCounter() {
-//   flowPulseCount++;
-// }
-
-// void waterFlowTask(void *pvParameters) {
-//   pinMode(WATER_FLOW_SENSOR_PIN, INPUT_PULLUP); // Set the sensor pin as input
-//   attachInterrupt(digitalPinToInterrupt(WATER_FLOW_SENSOR_PIN), flowPulseCounter, RISING); // Attach the interrupt
-
-//   while (1) {
-//     int count = flowPulseCount; // Get the current pulse count
-    
-
-//     float flowRate = (count / calibrationFactor) * (1000.0 / sampleTime); // Calculate the flow rate in L/min
-//     float volume = flowRate * (sampleTime / 60000.0); // Calculate the volume in liters
-//     totalWater += volume;
-//     waterFlow  = flowRate;
-//     Serial.print("Flow rate: ");
-//     Serial.print(flowRate);
-//     Serial.println(" L/min");
-//     Serial.print("Volume: ");
-//     Serial.print(volume);
-//     Serial.println(" L");
-//     flowPulseCount = 0; // Reset the pulse count
-
-//     vTaskDelay(sampleTime / portTICK_PERIOD_MS); // Wait for the next sample
-//   }
-// }
-
-
-
-uint8_t readnumber(void) {
+uint8_t readnumber() {
   uint8_t num = 0;
-
   while (num == 0) {
     while (!Serial.available());
     num = Serial.parseInt();
@@ -198,66 +153,50 @@ uint8_t readnumber(void) {
 
 TouchPoint getTouchCoordinates() {
   TouchPoint touchPoint;
-  uint16_t z = 600U; // Variable to hold the pressure value
+  uint16_t z = 600U;
   touchPoint.valid = tft.getTouch(&touchPoint.x, &touchPoint.y, z);
   return touchPoint;
 }
 
-
 void drawMenu() {
-     switch(fingerState) {
-      case waiting:
-        tft.fillScreen(ILI9341_BLACK);
-        tft.setCursor(10, 10);
-        tft.print("Please place your finger");
-        break;
-      case firstRead:
-        tft.fillScreen(ILI9341_BLACK);
-        tft.setCursor(10, 10);
-        tft.print("Reading finger...");
-        break;
-      case secondRead:
-        tft.fillScreen(ILI9341_BLACK);
-        tft.setCursor(10, 10);
-        tft.print("Please lift and place finger again");
-        break;
-      case verifying:
-        tft.fillScreen(ILI9341_BLACK);
-        tft.setCursor(10, 10);
-        tft.print("Verifying, please wait...");
-        break;
-      case ok:
-        tft.fillScreen(ILI9341_BLACK);
-        tft.setTextColor(TFT_GREEN);
-        tft.setCursor(10, 10);
-        tft.print("Fingerprint verified!");
-        break;
-      case fail:
-        tft.fillScreen(ILI9341_BLACK);
-        tft.setTextColor(TFT_RED);
-        tft.setCursor(10, 10);
-        tft.print("Verification failed!");
-        break;
-      case menu:
-        // Clear the display or draw the background first if needed
-      tft.fillScreen(ILI9341_BLACK);
+  tft.fillScreen(ILI9341_BLACK);
+  tft.setCursor(10, 10);
 
-      // Draw the menu buttons
+  switch (fingerState) {
+    case waiting:
+      tft.print("Please place your finger");
+      break;
+    case firstRead:
+      tft.print("Reading finger...");
+      break;
+    case secondRead:
+      tft.print("Please lift and place finger again");
+      break;
+    case verifying:
+      tft.print("Verifying, please wait...");
+      break;
+    case ok:
+      tft.setTextColor(TFT_GREEN);
+      tft.print("Fingerprint verified!");
+      break;
+    case fail:
+      tft.setTextColor(TFT_RED);
+      tft.print("Verification failed!");
+      break;
+    case menu:
       tft.fillRect(BUTTON1_X, BUTTON1_Y, BUTTON_WIDTH, BUTTON_HEIGHT, ILI9341_BLUE);
       tft.fillRect(BUTTON2_X, BUTTON2_Y, BUTTON_WIDTH, BUTTON_HEIGHT, ILI9341_GREEN);
 
-      // Add text labels for each button
       tft.setTextColor(ILI9341_WHITE);
       tft.setTextSize(2);
-      tft.setCursor(BUTTON1_X + (BUTTON_WIDTH - tft.textWidth("Enroll")) / 2, BUTTON1_Y + (BUTTON_HEIGHT - 16) / 2);  // Centering "Enroll"
+      tft.setCursor(BUTTON1_X + (BUTTON_WIDTH - tft.textWidth("Enroll")) / 2, BUTTON1_Y + (BUTTON_HEIGHT - 16) / 2);
       tft.print("Enroll");
-      tft.setCursor(BUTTON2_X + (BUTTON_WIDTH - tft.textWidth("Verify")) / 2, BUTTON2_Y + (BUTTON_HEIGHT - 16) / 2); // Centering "Verify"
+      tft.setCursor(BUTTON2_X + (BUTTON_WIDTH - tft.textWidth("Verify")) / 2, BUTTON2_Y + (BUTTON_HEIGHT - 16) / 2);
       tft.print("Verify");
       break;
-    }
+  }
 }
 
 bool isTouchWithinArea(TouchPoint p, int x, int y, int width, int height) {
-  
   return (p.x >= x && p.x <= x + width && p.y >= y && p.y <= y + height);
 }

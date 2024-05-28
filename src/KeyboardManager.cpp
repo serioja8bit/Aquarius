@@ -88,7 +88,7 @@ String checkTouch(String str) {
             tft.setTextColor(TFT_WHITE);
             tft.setTextSize(2);
             tft.print(str + ": " + currentText);  // Display the current text
-            delay(100);
+            delay(150);
             
         }
          
