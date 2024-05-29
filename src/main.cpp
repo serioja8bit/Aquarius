@@ -160,7 +160,7 @@ void setup() {
     config.token_status_callback = tokenStatusCallback; // see addons/TokenHelper.h
 
     Firebase.begin(&config, &auth);
-
+    //finger.emptyDatabase();
 }
 
 void loop() {
@@ -189,15 +189,22 @@ void loop() {
       id++;
       if (id == 0) return;
       Serial.print("Enrolling ID #"); Serial.println(id);
-      Firebase.setInt(fbdo, "test/int", id);
-      Serial.print(path);
       while (!getFingerprintEnroll(id));
-      //Firebase.RTDB.setInt(&fbdo, path, count);
-      //(Firebase.RTDB.setInt(&fbdo, "test/int", count)
       draw_Keyboard();
       name = checkTouch("Name");
+      path = "persons/" + String(id) + "/name/";
+      Firebase.setString(fbdo, path, name);
+      delay(100);
       age = checkTouch("Age");
+      path = "persons/" + String(id) + "/age/";
+      Firebase.setInt(fbdo, path, age.toInt());
+      
+      delay(100);
       weight = checkTouch("Weight");
+      path = "persons/" + String(id) + "/weight/";
+      Firebase.setInt(fbdo, path, weight.toInt());
+      
+      delay(100);
       drawInputFields(name, age, weight);
       delay(10000);
       fingerState = menu;
@@ -209,7 +216,16 @@ void loop() {
       drawMenu();
       id = 0;
       while (!(id = getFingerprintID()));
+      path = "persons/" + String(id) + "/name";
+      name =  Firebase.getString(fbdo, path) ? fbdo.to<const char *>() : fbdo.errorReason().c_str();
+      path = "persons/" + String(id) + "/age";
+      age  = Firebase.getInt(fbdo, path) ? fbdo.to<const char *>() : fbdo.errorReason().c_str();
+      path = "persons/" + String(id) + "/weight";
+      weight = Firebase.getInt(fbdo, path) ? fbdo.to<const char *>() : fbdo.errorReason().c_str();
+      
+      drawInputFields(name,age,weight);
       Serial.println(id);
+      delay(10000);
       fingerState = menu;
       action = -1;
       break;
@@ -277,3 +293,5 @@ void drawMenu() {
 bool isTouchWithinArea(TouchPoint p, int x, int y, int width, int height) {
   return (p.x >= x && p.x <= x + width && p.y >= y && p.y <= y + height);
 }
+
+
